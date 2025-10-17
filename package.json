@@ -1,0 +1,48 @@
+{
+  "name": "rt-mcp-server",
+  "version": "0.1.0",
+  "description": "MCP server for RT (Request Tracker) REST2 API - provides read-only access to tickets, correspondence, and attachments",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "rt-mcp-server": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/index.js",
+    "clean": "rm -rf dist",
+    "prepare": "npm run build",
+    "postinstall": "chmod +x dist/index.js 2>/dev/null || true"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/msekoranja/rt-mcp.git"
+  },
+  "homepage": "https://github.com/msekoranja/rt-mcp#readme",
+  "bugs": {
+    "url": "https://github.com/msekoranja/rt-mcp/issues"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "rt",
+    "request-tracker",
+    "rest-api",
+    "mcp-server",
+    "rt-rest2"
+  ],
+  "author": "Matej Sekoranja",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.4",
+    "commander": "^12.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "typescript": "^5.7.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

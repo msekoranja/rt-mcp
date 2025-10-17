@@ -1,0 +1,38 @@
+# Source files (we only need dist/)
+src/
+tsconfig.json
+
+# Python version
+python/
+
+# Documentation (keep README.md and LICENSE)
+docs/
+CLAUDE.md
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets and test files
+token.txt
+*.secret
+.env
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Development
+node_modules/
+.claude/
