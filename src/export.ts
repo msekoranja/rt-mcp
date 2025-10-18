@@ -325,6 +325,41 @@ async function downloadAttachment(
 }
 
 /**
+ * Slugify a string for use in filesystem paths.
+ * Converts to lowercase, allows only alphanumeric and dashes, truncates to maxLength.
+ */
+function slugify(text: string, maxLength: number = 50): string {
+  let slug = text
+    .toLowerCase()
+    .trim()
+    // Replace spaces with dashes
+    .replace(/\s+/g, "-")
+    // Remove all non-alphanumeric characters except dashes
+    .replace(/[^a-z0-9-]/g, "")
+    // Collapse multiple consecutive dashes to single dash
+    .replace(/-+/g, "-")
+    // Remove leading/trailing dashes
+    .replace(/^-+|-+$/g, "");
+
+  // Truncate to maxLength, trying to break at dash if possible
+  if (slug.length > maxLength) {
+    const truncated = slug.substring(0, maxLength);
+    const lastDash = truncated.lastIndexOf("-");
+    // If there's a dash within last 10 chars, break there for cleaner truncation
+    if (lastDash > maxLength - 10) {
+      slug = truncated.substring(0, lastDash);
+    } else {
+      slug = truncated;
+    }
+    // Remove trailing dash if truncation created one
+    slug = slug.replace(/-+$/, "");
+  }
+
+  // Fallback to "untitled" if slug is empty
+  return slug || "untitled";
+}
+
+/**
  * Format ticket data as markdown (compact format).
  */
 function formatTicketMarkdown(
@@ -379,13 +414,32 @@ function formatTicketMarkdown(
           continue;
         }
 
+        // Filter out meaningless messages like "t" or "t."
+        if (hasMessage) {
+          const trimmedMsg = entry.message!.trim().toLowerCase();
+          if (trimmedMsg === "t" || trimmedMsg === "t.") {
+            // Skip if only attachments remain
+            if (!hasAttachments) {
+              continue;
+            }
+            // If has attachments, we'll show them but not the "t" message
+          }
+        }
+
         // Compact correspondence header: **YYYY-MM-DD creator**: content
         const date = entry.created ? formatDate(entry.created) : "Unknown";
         const creator = entry.creator || "Unknown";
 
         if (hasMessage) {
-          // Output header with message content
-          lines.push(`**${date} ${creator}**: ${entry.message!.trim()}`);
+          const trimmedMsg = entry.message!.trim().toLowerCase();
+          // Skip rendering message if it's just "t" or "t." but render attachments
+          if (trimmedMsg === "t" || trimmedMsg === "t.") {
+            // Show header without message content
+            lines.push(`**${date} ${creator}**:`);
+          } else {
+            // Output header with message content
+            lines.push(`**${date} ${creator}**: ${entry.message!.trim()}`);
+          }
         } else {
           // No message, only attachments
           lines.push(`**${date} ${creator}**:`);
@@ -422,26 +476,59 @@ async function exportTicket(
   const indent = "  ".repeat(depth);
   console.log(`${indent}Exporting ticket ${ticketId}...`);
 
-  // Create ticket directory
-  const ticketDir = path.join(outputDir, `ticket-${ticketId}`);
-  if (!fs.existsSync(ticketDir)) {
-    fs.mkdirSync(ticketDir, { recursive: true });
-  }
-
-  // Fetch ticket data
+  // Fetch ticket data first to get the subject for slugification
   const ticket = await fetchTicket(ticketId);
   if (!ticket) {
     console.error(`${indent}Failed to fetch ticket ${ticketId}`);
     return;
   }
 
-  // Fetch correspondence
+  // Fetch correspondence to check for attachments
   const correspondence = await fetchCorrespondence(ticketId);
 
-  // Download binary attachments directly to ticket directory
+  // Count file attachments
+  const hasAttachments = correspondence.some(
+    (entry) => entry.attachments.length > 0
+  );
+
+  // Check for children if recursive (fetch hierarchy once)
+  let hasChildren = false;
+  let childIds: string[] = [];
+  if (recursive) {
+    const ticketData = await makeRTRequest(`/ticket/${ticketId}`);
+    const relationships = extractTicketRelationships(ticketData);
+    childIds = relationships.children;
+    hasChildren = childIds.length > 0;
+  }
+
+  // Decide whether to use subdirectory or flat file
+  const needsSubdirectory = hasAttachments || hasChildren;
+
+  const slugifiedTitle = slugify(ticket.subject);
+  const baseName = `${ticketId}-${slugifiedTitle}`;
+  let markdownPath: string;
+  let attachmentDir: string;
+  let ticketDir: string;
+
+  if (needsSubdirectory) {
+    // Create subdirectory for ticket with attachments or children
+    ticketDir = path.join(outputDir, baseName);
+    if (!fs.existsSync(ticketDir)) {
+      fs.mkdirSync(ticketDir, { recursive: true });
+    }
+    markdownPath = path.join(ticketDir, `${baseName}.md`);
+    attachmentDir = ticketDir;
+  } else {
+    // Write flat file directly to output directory
+    markdownPath = path.join(outputDir, `${baseName}.md`);
+    attachmentDir = outputDir; // Won't be used since no attachments
+    ticketDir = outputDir; // Not used
+  }
+
+  // Download binary attachments (if any)
   for (const entry of correspondence) {
     for (const attachment of entry.attachments) {
-      const attachmentPath = path.join(ticketDir, attachment.filename);
+      const attachmentPath = path.join(attachmentDir, attachment.filename);
       console.log(
         `${indent}  Downloading attachment: ${attachment.filename}...`
       );
@@ -451,27 +538,21 @@ async function exportTicket(
 
   // Write markdown file
   const markdownContent = formatTicketMarkdown(ticket, correspondence);
-  const markdownPath = path.join(ticketDir, `ticket-${ticketId}.md`);
   fs.writeFileSync(markdownPath, markdownContent, "utf-8");
   console.log(`${indent}Wrote ${markdownPath}`);
 
-  // Recursively export child tickets to same output directory
-  if (recursive) {
-    const ticketData = await makeRTRequest(`/ticket/${ticketId}`);
-    const relationships = extractTicketRelationships(ticketData);
-
-    if (relationships.children.length > 0) {
-      console.log(
-        `${indent}Found ${relationships.children.length} child ticket(s)`
+  // Recursively export child tickets to parent's directory (hierarchical structure)
+  if (recursive && hasChildren) {
+    console.log(
+      `${indent}Found ${childIds.length} child ticket(s)`
+    );
+    for (const childId of childIds) {
+      await exportTicket(
+        parseInt(childId, 10),
+        ticketDir, // Export children to parent's directory
+        recursive,
+        depth + 1
       );
-      for (const childId of relationships.children) {
-        await exportTicket(
-          parseInt(childId, 10),
-          outputDir,
-          recursive,
-          depth + 1
-        );
-      }
     }
   }
 }
