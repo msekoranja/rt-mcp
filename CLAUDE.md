@@ -82,7 +82,24 @@ export RT_BASE_URL="https://rt.example.com/REST/2.0"  # optional
 node dist/index.js
 ```
 
-**MCP Client Configuration (command-line args):**
+**MCP Client Configuration (using npx - recommended):**
+```json
+{
+  "mcpServers": {
+    "rt": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "rt-mcp-server",
+        "--api-token", "your-token-here",
+        "--url", "https://rt.example.com/REST/2.0"
+      ]
+    }
+  }
+}
+```
+
+**MCP Client Configuration (local development):**
 ```json
 {
   "mcpServers": {
@@ -103,8 +120,8 @@ node dist/index.js
 {
   "mcpServers": {
     "rt": {
-      "command": "node",
-      "args": ["/path/to/rt-mcp/dist/index.js"],
+      "command": "npx",
+      "args": ["-y", "rt-mcp-server"],
       "env": {
         "RT_TOKEN": "your-token-here",
         "RT_BASE_URL": "https://rt.example.com/REST/2.0"

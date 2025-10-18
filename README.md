@@ -31,11 +31,15 @@ A TypeScript MCP server that provides read-only access to RT (Request Tracker) v
 
 #### Using Command Line (Recommended)
 
+**macOS/Linux:**
 ```bash
-claude mcp add rt -- npx -y git+https://github.com/msekoranja/rt-mcp.git --api-token YOUR_RT_TOKEN --url https://rt.example.com/REST/2.0
+claude mcp add rt -- npx -y rt-mcp-server --api-token YOUR_RT_TOKEN --url https://rt.example.com/REST/2.0
 ```
 
-Note: The git URL will automatically download and install the latest version from GitHub.
+**Windows:**
+```bash
+claude mcp add rt -- cmd /c npx -y rt-mcp-server --api-token YOUR_RT_TOKEN --url https://rt.example.com/REST/2.0
+```
 
 #### Manual Configuration
 
@@ -48,7 +52,7 @@ Edit your Claude Code MCP configuration file and add:
       "command": "npx",
       "args": [
         "-y",
-        "git+https://github.com/msekoranja/rt-mcp.git",
+        "rt-mcp-server",
         "--api-token",
         "YOUR_RT_TOKEN",
         "--url",
@@ -77,7 +81,7 @@ Edit `claude_desktop_config.json` (location varies by OS):
 - **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
 - **Linux**: `~/.config/Claude/claude_desktop_config.json`
 
-Add this configuration:
+**macOS/Linux configuration:**
 
 ```json
 {
@@ -86,7 +90,29 @@ Add this configuration:
       "command": "npx",
       "args": [
         "-y",
-        "git+https://github.com/msekoranja/rt-mcp.git",
+        "rt-mcp-server",
+        "--api-token",
+        "YOUR_RT_TOKEN",
+        "--url",
+        "https://rt.example.com/REST/2.0"
+      ]
+    }
+  }
+}
+```
+
+**Windows configuration:**
+
+```json
+{
+  "mcpServers": {
+    "rt": {
+      "command": "cmd",
+      "args": [
+        "/c",
+        "npx",
+        "-y",
+        "rt-mcp-server",
         "--api-token",
         "YOUR_RT_TOKEN",
         "--url",
@@ -107,7 +133,7 @@ Restart Claude Desktop after saving.
 #### Using Command Line (Recommended)
 
 ```bash
-gemini mcp add rt npx -y git+https://github.com/msekoranja/rt-mcp.git --api-token YOUR_RT_TOKEN --url https://rt.example.com/REST/2.0
+gemini mcp add rt npx -y rt-mcp-server --api-token YOUR_RT_TOKEN --url https://rt.example.com/REST/2.0
 ```
 
 #### Manual Configuration
@@ -121,7 +147,7 @@ Edit the Gemini settings file at `~/.gemini/settings.json` and add the RT MCP se
       "command": "npx",
       "args": [
         "-y",
-        "git+https://github.com/msekoranja/rt-mcp.git",
+        "rt-mcp-server",
         "--api-token",
         "YOUR_RT_TOKEN",
         "--url",
@@ -140,7 +166,7 @@ Edit the Gemini settings file at `~/.gemini/settings.json` and add the RT MCP se
 #### Using Command Line (Recommended)
 
 ```bash
-codex mcp add rt npx -y git+https://github.com/msekoranja/rt-mcp.git --api-token YOUR_RT_TOKEN --url https://rt.example.com/REST/2.0
+codex mcp add rt npx -y rt-mcp-server --api-token YOUR_RT_TOKEN --url https://rt.example.com/REST/2.0
 ```
 
 #### Manual Configuration
@@ -152,7 +178,7 @@ Add the RT MCP server to your OpenAI Codex configuration using TOML format:
 command = "npx"
 args = [
   "-y",
-  "git+https://github.com/msekoranja/rt-mcp.git",
+  "rt-mcp-server",
   "--api-token",
   "YOUR_RT_TOKEN",
   "--url",
@@ -175,7 +201,7 @@ rt_toolkit = MCPToolkit(
         "command": "npx",
         "args": [
             "-y",
-            "git+https://github.com/msekoranja/rt-mcp.git",
+            "rt-mcp-server",
             "--api-token",
             "YOUR_RT_TOKEN",
             "--url",
