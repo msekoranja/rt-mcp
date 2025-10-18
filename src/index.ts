@@ -12,73 +12,12 @@ import {
   Tool,
 } from "@modelcontextprotocol/sdk/types.js";
 import { Command } from "commander";
-
-// Global configuration
-let RT_BASE_URL = "";
-let RT_TOKEN = "";
-
-/**
- * Make an authenticated request to the RT REST2 API.
- */
-async function makeRTRequest(endpoint: string): Promise<any> {
-  const url = `${RT_BASE_URL.replace(/\/$/, "")}${endpoint}`;
-  const headers = {
-    Authorization: `token ${RT_TOKEN}`,
-    Accept: "application/json",
-  };
-
-  const response = await fetch(url, {
-    method: "GET",
-    headers,
-    signal: AbortSignal.timeout(30000),
-  });
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(
-      `HTTP error ${response.status}: ${text || response.statusText}`
-    );
-  }
-
-  return response.json();
-}
-
-/**
- * Extract parent/child relationships from ticket _hyperlinks.
- */
-function extractTicketRelationships(ticketData: any): {
-  parents: string[];
-  children: string[];
-} {
-  const relationships = { parents: [] as string[], children: [] as string[] };
-
-  const hyperlinks = ticketData._hyperlinks || [];
-  for (const link of hyperlinks) {
-    const ref = link.ref;
-    const ticketId = link.id;
-
-    if (ref === "parent" && ticketId) {
-      relationships.parents.push(String(ticketId));
-    } else if (ref === "child" && ticketId) {
-      relationships.children.push(String(ticketId));
-    }
-  }
-
-  return relationships;
-}
-
-/**
- * Format file size to human-readable string.
- */
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) {
-    return `${bytes} bytes`;
-  } else if (bytes < 1024 * 1024) {
-    return `${(bytes / 1024).toFixed(1)} KB`;
-  } else {
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  }
-}
+import {
+  configureRT,
+  makeRTRequest,
+  extractTicketRelationships,
+  formatFileSize,
+} from "./lib.js";
 
 /**
  * Define MCP tools.
@@ -622,10 +561,7 @@ function parseArgs(): { url: string; apiToken: string } {
  * Configure global settings.
  */
 function configure(opts: { url: string; apiToken: string }) {
-  RT_BASE_URL = opts.url;
-  RT_TOKEN = opts.apiToken;
-
-  if (!RT_BASE_URL) {
+  if (!opts.url) {
     console.error(
       "Error: RT server URL is required.\n" +
         "Provide it via --url argument or RT_BASE_URL environment variable.\n" +
@@ -634,7 +570,7 @@ function configure(opts: { url: string; apiToken: string }) {
     process.exit(1);
   }
 
-  if (!RT_TOKEN) {
+  if (!opts.apiToken) {
     console.error(
       "Error: RT authentication token is required.\n" +
         "Provide it via --api-token argument or RT_TOKEN environment variable.\n" +
@@ -642,6 +578,8 @@ function configure(opts: { url: string; apiToken: string }) {
     );
     process.exit(1);
   }
+
+  configureRT(opts.url, opts.apiToken);
 }
 
 /**

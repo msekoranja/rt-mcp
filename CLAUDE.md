@@ -4,27 +4,60 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a TypeScript MCP server that provides read-only access to the RT (Request Tracker) REST2 API. It exposes RT tickets, correspondence, and attachments through the Model Context Protocol (MCP), allowing LLMs to search for tickets, query ticket information, retrieve correspondence with inline text, and download attachments.
+This is a TypeScript project with two main components:
+
+1. **MCP Server** (`src/index.ts`): Provides read-only access to RT (Request Tracker) REST2 API through the Model Context Protocol (MCP), allowing LLMs to search for tickets, query ticket information, retrieve correspondence, and download attachments.
+
+2. **Export Tool** (`src/export.ts`): Standalone CLI tool that exports RT tickets to markdown files with directory structure, including correspondence and binary attachments.
 
 **Key Technologies:**
 - TypeScript (Node.js ≥18.0.0) - Primary language
-- `@modelcontextprotocol/sdk` - Official MCP SDK for TypeScript
+- `@modelcontextprotocol/sdk` - Official MCP SDK for TypeScript (MCP server only)
 - Native `fetch` API - HTTP client for RT REST2 API calls
-- `commander` - CLI argument parsing
-- STDIO transport for MCP communication
+- `commander` - CLI argument parsing (both tools)
+- Native `fs` and `path` modules - File system operations (export tool)
+- STDIO transport for MCP communication (MCP server only)
 
 ## Architecture
 
-The codebase consists of a single MCP server (`src/index.ts`) that:
+### Shared Library (`src/lib.ts`)
 
-1. **Authenticates via token**: Uses `RT_TOKEN` environment variable or CLI argument with RT's token-based auth
-2. **Provides five main tools**:
-   - `search_tickets()` - Searches for tickets using simple query syntax, returns summary information for matching tickets
-   - `get_ticket()` - Fetches complete ticket metadata (subject, status, queue, owner, dates, priority, custom fields, etc.)
-   - `get_ticket_correspondence()` - Retrieves ticket correspondence grouped by transaction, showing inline text messages and file attachment metadata
-   - `get_attachment()` - Downloads individual attachments by ID, returning base64-encoded content with metadata for any file type
-   - `get_ticket_hierarchy()` - Builds ticket hierarchy tree showing parent/child relationships, with optional recursive fetching
-3. **Makes authenticated HTTP requests**: The `makeRTRequest()` helper handles all API communication with proper headers and error handling
+Contains common functionality used by both the MCP server and export tool:
+- `configureRT()` - Sets global RT URL and authentication token
+- `makeRTRequest()` - Makes authenticated HTTP requests to RT REST2 API
+- `extractTicketRelationships()` - Parses ticket hyperlinks for parent/child relationships
+- `formatFileSize()` - Converts byte counts to human-readable sizes
+
+### MCP Server (`src/index.ts`)
+
+Provides five MCP tools for LLM integration:
+1. `search_tickets()` - Searches for tickets using simple query syntax, returns summary information for matching tickets
+2. `get_ticket()` - Fetches complete ticket metadata (subject, status, queue, owner, dates, priority, custom fields, etc.)
+3. `get_ticket_correspondence()` - Retrieves ticket correspondence grouped by transaction, showing inline text messages and file attachment metadata
+4. `get_attachment()` - Downloads individual attachments by ID, returning base64-encoded content with metadata for any file type
+5. `get_ticket_hierarchy()` - Builds ticket hierarchy tree showing parent/child relationships, with optional recursive fetching
+
+**MCP Server Flow:**
+1. Parses CLI arguments or environment variables for RT URL and token
+2. Configures RT connection via shared library
+3. Creates MCP server with STDIO transport
+4. Registers tool handlers
+5. Processes tool requests from MCP clients
+
+### Export Tool (`src/export.ts`)
+
+Standalone CLI tool for exporting tickets to markdown:
+1. **Parses CLI arguments**: ticket ID, --recursive flag, RT URL, token, output directory
+2. **Configures RT connection**: Uses shared library for authentication
+3. **Fetches ticket data**: Uses `makeRTRequest()` to get ticket, correspondence, and attachments
+4. **Filters attachments**: Skips 0-byte attachments (RT metadata artifacts like ticket subjects)
+5. **Creates flat directory structure**:
+   - `ticket-{id}/` - One directory per ticket
+   - `ticket-{id}.md` - Markdown file with ticket metadata and correspondence
+   - Attachments placed directly in ticket directory (no subdirectories)
+6. **Formats markdown**: Converts ticket data to readable markdown with headers, metadata, and correspondence
+7. **Downloads attachments**: Saves binary files directly to ticket directory
+8. **Recursive export**: Exports child tickets to same output directory (flat structure) when --recursive flag is used
 
 **Authentication Flow:**
 - Token is read from `RT_TOKEN` environment variable or `--api-token` CLI argument at startup
@@ -64,7 +97,9 @@ The server supports two configuration methods with priority: command-line argume
 - `RT_TOKEN` - RT authentication token
 - `RT_BASE_URL` - RT server base URL
 
-## Running the Server
+## Running the Tools
+
+### MCP Server
 
 ```bash
 # Install dependencies
@@ -131,6 +166,27 @@ node dist/index.js
 }
 ```
 
+### Export Tool
+
+```bash
+# Build the project (if not already built)
+npm run build
+
+# Export a single ticket
+npx rt-export-md 12345 --api-token "your-token-here" --url "https://rt.example.com/REST/2.0"
+
+# Export with child tickets recursively
+npx rt-export-md 12345 --recursive --api-token "your-token-here" --url "https://rt.example.com/REST/2.0"
+
+# Export to specific directory
+npx rt-export-md 12345 --recursive -o ./exports --api-token "your-token-here" --url "https://rt.example.com/REST/2.0"
+
+# Using environment variables
+export RT_TOKEN="your-token-here"
+export RT_BASE_URL="https://rt.example.com/REST/2.0"
+npx rt-export-md 12345 --recursive
+```
+
 ## API Endpoints Used
 
 The server uses these RT REST2 API endpoints:
@@ -178,7 +234,9 @@ This server only implements GET operations - no ticket creation, updates, or del
 ```
 rt-mcp/
 ├── src/
-│   └── index.ts        # Main MCP server (single file implementation)
+│   ├── index.ts        # MCP server implementation
+│   ├── export.ts       # Export tool implementation
+│   └── lib.ts          # Shared library (RT API helpers)
 ├── dist/               # Compiled JavaScript (generated by tsc)
 ├── package.json        # npm dependencies and scripts
 ├── tsconfig.json       # TypeScript compiler configuration

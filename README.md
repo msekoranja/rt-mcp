@@ -7,12 +7,18 @@ A TypeScript MCP server that provides read-only access to RT (Request Tracker) v
 - **Read-only access** to RT tickets, correspondence, and attachments
 - **Token-based authentication** via RT REST2 API
 - **Command-line & environment variable configuration**
-- **Five main tools**:
-  - `search_tickets` - Search for tickets using simple query syntax
-  - `get_ticket` - Retrieve complete ticket information
-  - `get_ticket_correspondence` - Get ticket correspondence grouped by transaction with inline text and file metadata
-  - `get_attachment` - Download any attachment by ID with base64-encoded content
-  - `get_ticket_hierarchy` - Build ticket parent/child relationship trees
+- **Two modes of operation**:
+  - **MCP Server Mode**: Five tools for LLM integration via Model Context Protocol
+    - `search_tickets` - Search for tickets using simple query syntax
+    - `get_ticket` - Retrieve complete ticket information
+    - `get_ticket_correspondence` - Get ticket correspondence grouped by transaction with inline text and file metadata
+    - `get_attachment` - Download any attachment by ID with base64-encoded content
+    - `get_ticket_hierarchy` - Build ticket parent/child relationship trees
+  - **Export Mode**: Standalone CLI tool to export tickets to markdown
+    - Export tickets with correspondence to markdown files
+    - Organize exports in directory structure (ticket-{id}/)
+    - Download binary attachments separately
+    - Recursive child ticket export support
 - **STDIO transport** for seamless integration with MCP clients
 - **TypeScript** for type safety and better developer experience
 - **Easy deployment** with npm/npx
@@ -248,41 +254,122 @@ The server supports configuration via command-line arguments or environment vari
 
 **Priority:** Command-line arguments override environment variables.
 
-## Usage with MCP Clients
+## Usage
+
+### Export Mode: Standalone CLI
+
+The `rt-export-md` command exports RT tickets to markdown files with a structured directory layout.
+
+#### Basic Usage
+
+```bash
+# Export a single ticket
+npx rt-export-md 12345 --api-token "YOUR_TOKEN" --url "https://rt.example.com/REST/2.0"
+
+# Export a ticket with all child tickets recursively
+npx rt-export-md 12345 --recursive --api-token "YOUR_TOKEN" --url "https://rt.example.com/REST/2.0"
+
+# Export to a specific output directory
+npx rt-export-md 12345 --recursive -o ./exports --api-token "YOUR_TOKEN" --url "https://rt.example.com/REST/2.0"
+
+# Use environment variables for authentication
+export RT_TOKEN="YOUR_TOKEN"
+export RT_BASE_URL="https://rt.example.com/REST/2.0"
+npx rt-export-md 12345 --recursive
+```
+
+#### Command-Line Options
+
+- `<ticket-id>` - RT ticket ID to export (required)
+- `--recursive` - Include child tickets recursively (optional)
+- `--url <url>` - RT REST2 API base URL (can use RT_BASE_URL env var)
+- `--api-token <token>` - RT authentication token (can use RT_TOKEN env var)
+- `-o, --output <dir>` - Output directory (default: current directory)
+
+#### Output Structure
+
+The export creates a flat directory structure like this:
+
+```
+ticket-12345/
+├── ticket-12345.md       # Main ticket with metadata and correspondence
+├── document.pdf          # Binary attachments directly in ticket dir
+└── screenshot.png
+ticket-12346/             # Child tickets at same level (if --recursive)
+├── ticket-12346.md
+└── attachment.pdf
+ticket-12347/
+└── ticket-12347.md
+```
+
+#### Markdown Format
+
+Each ticket markdown file includes:
+
+- **Metadata section**: Status, queue, owner, creator, requestors, dates
+- **Correspondence section**: Chronological transaction history with:
+  - Transaction ID and timestamp
+  - Creator/author information
+  - Inline text messages (embedded in markdown)
+  - Links to binary attachments (downloaded to ticket directory)
+
+### MCP Server Mode: Integration with LLMs
 
 After installing the RT MCP server in your preferred MCP client (see Installation section above), you can interact with RT tickets using natural language.
 
 ## Usage Examples
 
-### Example 1: Searching for Tickets
+### Export Mode Examples
+
+#### Example 1: Export Single Ticket
+```bash
+npx rt-export-md 12345 --api-token "YOUR_TOKEN" --url "https://rt.example.com/REST/2.0"
+```
+Creates `ticket-12345/` directory with markdown file and attachments.
+
+#### Example 2: Export with Child Tickets
+```bash
+npx rt-export-md 12345 --recursive --api-token "YOUR_TOKEN" --url "https://rt.example.com/REST/2.0"
+```
+Creates nested directory structure with parent ticket and all descendants.
+
+#### Example 3: Export to Custom Location
+```bash
+npx rt-export-md 12345 --recursive -o ~/rt-exports --api-token "YOUR_TOKEN" --url "https://rt.example.com/REST/2.0"
+```
+Exports to `~/rt-exports/ticket-12345/` directory.
+
+### MCP Server Mode Examples
+
+#### Example 1: Searching for Tickets
 
 Ask your MCP-enabled LLM:
 > "Find all tickets about database errors"
 
 The LLM will use `search_tickets(query="database errors")` to find matching tickets and display a summary of results.
 
-### Example 2: Checking Ticket Status
+#### Example 2: Checking Ticket Status
 
 Ask your MCP-enabled LLM:
 > "What is the status of RT ticket 12345?"
 
 The LLM will use `get_ticket(12345)` to fetch the ticket details and report the status, owner, priority, and other relevant information.
 
-### Example 3: Reading Ticket Correspondence
+#### Example 3: Reading Ticket Correspondence
 
 Ask your MCP-enabled LLM:
 > "Show me all the comments and correspondence from RT ticket 67890"
 
 The LLM will use `get_ticket_correspondence(67890)` to retrieve all correspondence grouped by transaction, including inline text messages and file attachment metadata.
 
-### Example 4: Downloading Attachments
+#### Example 4: Downloading Attachments
 
 Ask your MCP-enabled LLM:
 > "Download the PDF receipt from RT ticket 67890"
 
 The LLM will use `get_ticket_correspondence(67890)` to find attachment IDs, then `get_attachment(attachment_id)` to download the specific file with base64-encoded content.
 
-### Example 5: Exploring Ticket Hierarchies
+#### Example 5: Exploring Ticket Hierarchies
 
 Ask your MCP-enabled LLM:
 > "Show me the parent and child tickets for RT ticket 54321"
