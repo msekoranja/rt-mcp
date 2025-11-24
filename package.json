@@ -16,9 +16,8 @@
     "build": "tsc",
     "dev": "tsc --watch",
     "start": "node dist/index.js",
-    "clean": "rm -rf dist",
-    "prepare": "npm run build",
-    "postinstall": "chmod +x dist/index.js 2>/dev/null || true"
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
+    "prepare": "npm run build"
   },
   "repository": {
     "type": "git",
